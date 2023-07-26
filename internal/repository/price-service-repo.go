@@ -26,12 +26,16 @@ func NewPriceServiceRepository(client *redis.Client, cfg *config.Config) *PriceS
 }
 
 // ReadFromStream reads last message from the redis stream
-func (rdsStream *PriceServiceRepository) ReadFromStream(ctx context.Context) (shares []*model.Share, err error) {
-	results, err := rdsStream.client.XRevRange(ctx, rdsStream.cfg.RedisStreamName, "+", "-").Result()
+func (priceServiceRepo *PriceServiceRepository) ReadFromStream(ctx context.Context) (shares []*model.Share, err error) {
+	results, err := priceServiceRepo.client.XRevRange(ctx, priceServiceRepo.cfg.RedisStreamName, "+", "-").Result()
 	if err != nil {
 		return nil, fmt.Errorf("PriceServiceRepository -> ReadFromStream -> XRead -> %w", err)
 	}
-	err = json.Unmarshal([]byte(results[0].Values[rdsStream.cfg.RedisStreamField].(string)), &shares)
+	if len(results) == 0 {
+		return nil, fmt.Errorf("PriceServiceRepository -> ReadFromStream -> error: message is empty")
+	}
+
+	err = json.Unmarshal([]byte(results[0].Values[priceServiceRepo.cfg.RedisStreamField].(string)), &shares)
 	if err != nil {
 		return nil, fmt.Errorf("PriceServiceRepository -> ReadFromStream -> json.Unmarshal -> %w", err)
 	}

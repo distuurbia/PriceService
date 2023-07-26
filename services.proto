@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+option go_package = "github.com/distuurbia/PriceService/proto_services";
+
+message Share {
+    string Name = 1;
+    double Price = 2;
+}
+
+service PriceServiceService {
+    rpc ReadFromStream(ReadFromStreamRequest) returns (stream ReadFromStreamResponse) {}
+}
+
+message ReadFromStreamRequest {}
+
+message ReadFromStreamResponse {
+    repeated Share shares = 1;
+}
