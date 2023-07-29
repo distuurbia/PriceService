@@ -6,49 +6,43 @@ import (
 
 	"github.com/distuurbia/PriceService/internal/model"
 	"github.com/distuurbia/PriceService/proto_services"
-	"github.com/go-playground/validator"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
 
 // PriceServiceService is an interface that contains methods of PriceService service.
 type PriceServiceService interface {
 	ReadFromStream(ctx context.Context) (shares []*model.Share, err error)
+	AddSubscriber(subscriberID uuid.UUID, selectedShares []string)
+	DeleteSubscriber(subscriberID uuid.UUID)
+	SendToSubscriber(ctx context.Context, subscriberID uuid.UUID, stream proto_services.PriceServiceService_SubscribeServer)
+	SendToAllSubscribedChans(ctx context.Context)
 }
 
-// GRPCHandler is responsible for handling gRPC requests related to entities.
-type GRPCHandler struct {
+// Handler is responsible for handling gRPC requests related to entities.
+type Handler struct {
 	priceServiceSrv PriceServiceService
-	validate        *validator.Validate
 	proto_services.UnimplementedPriceServiceServiceServer
 }
 
-// NewGRPCHandler creates a new instance of the GRPCHandler struct.
-func NewGRPCHandler(priceServiceSrv PriceServiceService, v *validator.Validate) *GRPCHandler {
-	return &GRPCHandler{
+// NewHandler creates a new instance of the Handler struct.
+func NewHandler(priceServiceSrv PriceServiceService) *Handler {
+	return &Handler{
 		priceServiceSrv: priceServiceSrv,
-		validate:        v,
 	}
 }
 
-// ReadFromStream takes message from redis stream through PriceServiceService and sends it to grpc stream.
-func (h *GRPCHandler) ReadFromStream(_ *proto_services.ReadFromStreamRequest, stream proto_services.PriceServiceService_ReadFromStreamServer) error {
-	for {
-		shares, err := h.priceServiceSrv.ReadFromStream(context.Background())
-		if err != nil {
-			logrus.Errorf("GRPCHandler -> ReadFromStream: %v", err)
-			return err
-		}
-		var protoShares []*proto_services.Share
-		for _, share := range shares {
-			protoShares = append(protoShares, &proto_services.Share{
-				Name:  share.Name,
-				Price: share.Price,
-			})
-		}
-		err = stream.Send(&proto_services.ReadFromStreamResponse{Shares: protoShares})
-		if err != nil {
-			logrus.Errorf("GRPCHandler -> ReadFromStream -> stream.Send: %v", err)
-			return err
-		}
+// Subscribe takes message from redis stream through PriceServiceService and sends it to grpc stream.
+func (handl *Handler) Subscribe(req *proto_services.SubscribeRequest, stream proto_services.PriceServiceService_SubscribeServer) error {
+	subscriberID, err := uuid.Parse(req.UUID)
+	if err != nil {
+		logrus.Errorf("Handler -> ReadFromStream -> uuid.Parse: %v", err)
+		return err
 	}
+
+	handl.priceServiceSrv.AddSubscriber(subscriberID, req.SelectedShares)
+	handl.priceServiceSrv.SendToSubscriber(stream.Context(), subscriberID, stream)
+	handl.priceServiceSrv.DeleteSubscriber(subscriberID)
+
+	return nil
 }

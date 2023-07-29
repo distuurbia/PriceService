@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/caarlos0/env v3.5.0+incompatible
 	github.com/go-redis/redis/v8 v8.11.5
+	github.com/google/uuid v1.3.0
 	github.com/ory/dockertest v3.3.5+incompatible
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.2
@@ -12,11 +13,7 @@ require (
 	google.golang.org/protobuf v1.30.0
 )
 
-require (
-	github.com/go-playground/locales v0.14.1 // indirect
-	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/leodido/go-urn v1.2.4 // indirect
-)
+require github.com/stretchr/objx v0.5.0 // indirect
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
@@ -29,7 +26,6 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/go-playground/validator v9.31.0+incompatible
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/gotestyourself/gotestyourself v2.2.0+incompatible // indirect
 	github.com/lib/pq v1.10.9 // indirect

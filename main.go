@@ -3,14 +3,17 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"net"
 
 	"github.com/caarlos0/env"
 	"github.com/distuurbia/PriceService/internal/config"
+	"github.com/distuurbia/PriceService/internal/handler"
 	"github.com/distuurbia/PriceService/internal/repository"
 	"github.com/distuurbia/PriceService/internal/service"
+	"github.com/distuurbia/PriceService/proto_services"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 )
 
 // connectRedis connects to the redis db
@@ -30,13 +33,17 @@ func main() {
 	client := connectRedis(&cfg)
 	priceServiceRepo := repository.NewPriceServiceRepository(client, &cfg)
 	priceServiceService := service.NewPriceServiceService(priceServiceRepo)
-	for {
-		shares, err := priceServiceService.ReadFromStream(context.Background())
-		if err != nil {
-			logrus.Fatalf("main -> %v", err)
-		}
-		for _, share := range shares {
-			fmt.Println(share)
-		}
+	handl := handler.NewHandler(priceServiceService)
+	go priceServiceService.SendToAllSubscribedChans(context.Background())
+	lis, err := net.Listen("tcp", "localhost:5433")
+	if err != nil {
+		logrus.Fatalf("cannot connect listener: %s", err)
+	}
+	serverRegistrar := grpc.NewServer()
+	proto_services.RegisterPriceServiceServiceServer(serverRegistrar, handl)
+
+	err = serverRegistrar.Serve(lis)
+	if err != nil {
+		logrus.Fatalf("cannot serve: %s", err)
 	}
 }
