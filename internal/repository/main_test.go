@@ -40,11 +40,8 @@ func SetupRedis() (*redis.Client, func(), error) {
 }
 
 func TestMain(m *testing.M) {
-	const (
-		berkshirePrice = 453066
-	)
-	testShares = append(testShares,
-		&model.Share{Name: "Berkshire Hathaway Inc.", Price: berkshirePrice})
+	const berkshirePrice = 453066
+	testShares = append(testShares, &model.Share{Name: "Berkshire Hathaway Inc.", Price: berkshirePrice})
 
 	rdsClient, cleanupRds, err := SetupRedis()
 	if err != nil {

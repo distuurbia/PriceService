@@ -22,7 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PriceServiceServiceClient interface {
-	ReadFromStream(ctx context.Context, in *ReadFromStreamRequest, opts ...grpc.CallOption) (PriceServiceService_ReadFromStreamClient, error)
+	Subscribe(ctx context.Context, in *SubscribeRequest, opts ...grpc.CallOption) (PriceServiceService_SubscribeClient, error)
 }
 
 type priceServiceServiceClient struct {
@@ -33,12 +33,12 @@ func NewPriceServiceServiceClient(cc grpc.ClientConnInterface) PriceServiceServi
 	return &priceServiceServiceClient{cc}
 }
 
-func (c *priceServiceServiceClient) ReadFromStream(ctx context.Context, in *ReadFromStreamRequest, opts ...grpc.CallOption) (PriceServiceService_ReadFromStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &PriceServiceService_ServiceDesc.Streams[0], "/PriceServiceService/ReadFromStream", opts...)
+func (c *priceServiceServiceClient) Subscribe(ctx context.Context, in *SubscribeRequest, opts ...grpc.CallOption) (PriceServiceService_SubscribeClient, error) {
+	stream, err := c.cc.NewStream(ctx, &PriceServiceService_ServiceDesc.Streams[0], "/PriceServiceService/Subscribe", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &priceServiceServiceReadFromStreamClient{stream}
+	x := &priceServiceServiceSubscribeClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -48,17 +48,17 @@ func (c *priceServiceServiceClient) ReadFromStream(ctx context.Context, in *Read
 	return x, nil
 }
 
-type PriceServiceService_ReadFromStreamClient interface {
-	Recv() (*ReadFromStreamResponse, error)
+type PriceServiceService_SubscribeClient interface {
+	Recv() (*SubscribeResponse, error)
 	grpc.ClientStream
 }
 
-type priceServiceServiceReadFromStreamClient struct {
+type priceServiceServiceSubscribeClient struct {
 	grpc.ClientStream
 }
 
-func (x *priceServiceServiceReadFromStreamClient) Recv() (*ReadFromStreamResponse, error) {
-	m := new(ReadFromStreamResponse)
+func (x *priceServiceServiceSubscribeClient) Recv() (*SubscribeResponse, error) {
+	m := new(SubscribeResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (x *priceServiceServiceReadFromStreamClient) Recv() (*ReadFromStreamRespons
 // All implementations must embed UnimplementedPriceServiceServiceServer
 // for forward compatibility
 type PriceServiceServiceServer interface {
-	ReadFromStream(*ReadFromStreamRequest, PriceServiceService_ReadFromStreamServer) error
+	Subscribe(*SubscribeRequest, PriceServiceService_SubscribeServer) error
 	mustEmbedUnimplementedPriceServiceServiceServer()
 }
 
@@ -77,8 +77,8 @@ type PriceServiceServiceServer interface {
 type UnimplementedPriceServiceServiceServer struct {
 }
 
-func (UnimplementedPriceServiceServiceServer) ReadFromStream(*ReadFromStreamRequest, PriceServiceService_ReadFromStreamServer) error {
-	return status.Errorf(codes.Unimplemented, "method ReadFromStream not implemented")
+func (UnimplementedPriceServiceServiceServer) Subscribe(*SubscribeRequest, PriceServiceService_SubscribeServer) error {
+	return status.Errorf(codes.Unimplemented, "method Subscribe not implemented")
 }
 func (UnimplementedPriceServiceServiceServer) mustEmbedUnimplementedPriceServiceServiceServer() {}
 
@@ -93,24 +93,24 @@ func RegisterPriceServiceServiceServer(s grpc.ServiceRegistrar, srv PriceService
 	s.RegisterService(&PriceServiceService_ServiceDesc, srv)
 }
 
-func _PriceServiceService_ReadFromStream_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(ReadFromStreamRequest)
+func _PriceServiceService_Subscribe_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(SubscribeRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(PriceServiceServiceServer).ReadFromStream(m, &priceServiceServiceReadFromStreamServer{stream})
+	return srv.(PriceServiceServiceServer).Subscribe(m, &priceServiceServiceSubscribeServer{stream})
 }
 
-type PriceServiceService_ReadFromStreamServer interface {
-	Send(*ReadFromStreamResponse) error
+type PriceServiceService_SubscribeServer interface {
+	Send(*SubscribeResponse) error
 	grpc.ServerStream
 }
 
-type priceServiceServiceReadFromStreamServer struct {
+type priceServiceServiceSubscribeServer struct {
 	grpc.ServerStream
 }
 
-func (x *priceServiceServiceReadFromStreamServer) Send(m *ReadFromStreamResponse) error {
+func (x *priceServiceServiceSubscribeServer) Send(m *SubscribeResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -123,8 +123,8 @@ var PriceServiceService_ServiceDesc = grpc.ServiceDesc{
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "ReadFromStream",
-			Handler:       _PriceServiceService_ReadFromStream_Handler,
+			StreamName:    "Subscribe",
+			Handler:       _PriceServiceService_Subscribe_Handler,
 			ServerStreams: true,
 		},
 	},

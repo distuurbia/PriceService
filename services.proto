@@ -8,11 +8,14 @@ message Share {
 }
 
 service PriceServiceService {
-    rpc ReadFromStream(ReadFromStreamRequest) returns (stream ReadFromStreamResponse) {}
+    rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse) {}
 }
 
-message ReadFromStreamRequest {}
+message SubscribeRequest {
+    string UUID = 1;
+    repeated string selectedShares = 2;
+}
 
-message ReadFromStreamResponse {
+message SubscribeResponse {
     repeated Share shares = 1;
 }
