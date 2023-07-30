@@ -16,6 +16,6 @@ type Share struct {
 // SubscribersManager contains all subscribers by uuid and their subscribed shares in map subscribers
 type SubscribersManager struct {
 	Mu                sync.RWMutex
-	SubscribersShares map[uuid.UUID]chan []*Share
 	Subscribers       map[uuid.UUID][]string
+	SubscribersShares map[uuid.UUID]chan []*Share
 }

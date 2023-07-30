@@ -10,8 +10,6 @@ import (
 	"github.com/distuurbia/PriceService/internal/model"
 	"github.com/distuurbia/PriceService/proto_services"
 	"github.com/go-redis/redis/v8"
-	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 )
 
 // PriceServiceRepository contains redis client
@@ -34,6 +32,7 @@ func (priceServiceRepo *PriceServiceRepository) ReadFromStream(ctx context.Conte
 	if err != nil {
 		return nil, fmt.Errorf("PriceServiceRepository -> ReadFromStream -> XRead -> %w", err)
 	}
+	
 	if len(results) == 0 {
 		return nil, fmt.Errorf("PriceServiceRepository -> ReadFromStream -> error: message is empty")
 	}
@@ -47,26 +46,11 @@ func (priceServiceRepo *PriceServiceRepository) ReadFromStream(ctx context.Conte
 }
 
 // SendToSubscriber sends the messages from redis stream to exact subscriber
-func (priceServiceRepo *PriceServiceRepository) SendToSubscriber(ctx context.Context, subscriberID uuid.UUID,
-	subscribersShares map[uuid.UUID]chan []*model.Share, stream proto_services.PriceServiceService_SubscribeServer) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case shares := <-subscribersShares[subscriberID]:
-			var protoShares []*proto_services.Share
-			for _, share := range shares {
-				protoShares = append(protoShares, &proto_services.Share{
-					Name:  share.Name,
-					Price: share.Price,
-				})
-			}
-
-			err := stream.Send(&proto_services.SubscribeResponse{Shares: protoShares})
-			if err != nil {
-				logrus.Errorf("PriceServiceRepository -> SendToSubscriber -> stream.Send: %v", err)
-				return
-			}
-		}
+func (priceServiceRepo *PriceServiceRepository) SendToSubscriber(protoShares []*proto_services.Share,
+	stream proto_services.PriceServiceService_SubscribeServer) error {
+	err := stream.Send(&proto_services.SubscribeResponse{Shares: protoShares})
+	if err != nil {
+		return fmt.Errorf("PriceServiceRepository -> SendToSubscriber -> stream.Send -> %w", err)
 	}
+	return nil
 }
