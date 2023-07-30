@@ -15,7 +15,8 @@ import (
 // PriceServiceRepository is an interface of PriceServiceRepository structure of repository
 type PriceServiceRepository interface {
 	ReadFromStream(ctx context.Context) (shares []*model.Share, err error)
-	SendToSubscriber(ctx context.Context, subscriberID uuid.UUID, subscribersShares map[uuid.UUID]chan []*model.Share, stream proto_services.PriceServiceService_SubscribeServer)
+	SendToSubscriber(protoShares []*proto_services.Share,
+		stream proto_services.PriceServiceService_SubscribeServer) error
 }
 
 // PriceServiceService contains an inerface of PriceServiceRepository
@@ -32,24 +33,38 @@ func NewPriceServiceService(priceServiceRepo PriceServiceRepository) *PriceServi
 }
 
 // AddSubscriber adds new subscriber to subscribe map in SubscriberManager
-func (priceServiceSrv *PriceServiceService) AddSubscriber(subscriberID uuid.UUID, selectedShares []string) {
+func (priceServiceSrv *PriceServiceService) AddSubscriber(subscriberID uuid.UUID, selectedShares []string) error {
+	const msgs = 1
 	priceServiceSrv.subscribersMngr.Mu.Lock()
 	defer priceServiceSrv.subscribersMngr.Mu.Unlock()
-	priceServiceSrv.subscribersMngr.Subscribers[subscriberID] = selectedShares
+	if subscriberID == uuid.Nil {
+		return fmt.Errorf("PriceServiceService -> AddSubscriber -> error: subscriber has nil uuid")
+	}
+	if len(selectedShares) == 0 {
+		return fmt.Errorf("PriceServiceService -> AddSubscriber -> error: subscriber hasn't subscribed on any shares")
+	}
+	if _, ok := priceServiceSrv.subscribersMngr.Subscribers[subscriberID]; !ok {
+		priceServiceSrv.subscribersMngr.Subscribers[subscriberID] = selectedShares
+		priceServiceSrv.subscribersMngr.SubscribersShares[subscriberID] = make(chan []*model.Share, msgs)
+		return nil
+	}
+	return fmt.Errorf("PriceServiceService -> AddSubscriber -> error: subscriber with such ID already exists")
 }
 
 // DeleteSubscriber delete subscriber from subscribe map in SubscriberManager by uuid
-func (priceServiceSrv *PriceServiceService) DeleteSubscriber(subscriberID uuid.UUID) {
+func (priceServiceSrv *PriceServiceService) DeleteSubscriber(subscriberID uuid.UUID) error {
 	priceServiceSrv.subscribersMngr.Mu.Lock()
 	defer priceServiceSrv.subscribersMngr.Mu.Unlock()
-	delete(priceServiceSrv.subscribersMngr.Subscribers, subscriberID)
-}
-
-// GetSubscribers gets subscribers from subscribers manager
-func (priceServiceSrv *PriceServiceService) GetSubscribers() map[uuid.UUID][]string {
-	priceServiceSrv.subscribersMngr.Mu.Lock()
-	defer priceServiceSrv.subscribersMngr.Mu.Unlock()
-	return priceServiceSrv.subscribersMngr.Subscribers
+	if subscriberID == uuid.Nil {
+		return fmt.Errorf("PriceServiceService -> DeleteSubscriber -> error: subscriber has nil uuid")
+	}
+	if _, ok := priceServiceSrv.subscribersMngr.Subscribers[subscriberID]; ok {
+		delete(priceServiceSrv.subscribersMngr.Subscribers, subscriberID)
+		close(priceServiceSrv.subscribersMngr.SubscribersShares[subscriberID])
+		delete(priceServiceSrv.subscribersMngr.SubscribersShares, subscriberID)
+		return nil
+	}
+	return fmt.Errorf("PriceServiceService -> DeleteSubscriber -> error: subscriber with such ID doesn't exists")
 }
 
 // ReadFromStream reads last message from the redis stream using repository ReadFromStream method
@@ -63,7 +78,6 @@ func (priceServiceSrv *PriceServiceService) ReadFromStream(ctx context.Context) 
 
 // SendToAllSubscribedChans sends in loop actual info about subscribed shares to subscribers chans
 func (priceServiceSrv *PriceServiceService) SendToAllSubscribedChans(ctx context.Context) {
-	const msgs = 100
 	for {
 		if len(priceServiceSrv.subscribersMngr.Subscribers) > 0 {
 			shares, err := priceServiceSrv.ReadFromStream(ctx)
@@ -71,21 +85,45 @@ func (priceServiceSrv *PriceServiceService) SendToAllSubscribedChans(ctx context
 				logrus.Errorf("PriceServiceService -> SendToAllSubscribedChans: %v", err)
 				return
 			}
-			for subID, selcetedShares := range priceServiceSrv.GetSubscribers() {
+			for subID, selcetedShares := range priceServiceSrv.subscribersMngr.Subscribers {
 				tempShares := make([]*model.Share, 0)
 				for _, share := range shares {
 					if strings.Contains(strings.Join(selcetedShares, ","), share.Name) {
 						tempShares = append(tempShares, share)
 					}
 				}
-				priceServiceSrv.subscribersMngr.SubscribersShares[subID] = make(chan []*model.Share, msgs)
-				priceServiceSrv.subscribersMngr.SubscribersShares[subID] <- tempShares
+
+				select {
+					case <- ctx.Done():
+						return
+					case priceServiceSrv.subscribersMngr.SubscribersShares[subID] <- tempShares:
+				}
+				
 			}
 		}
+
 	}
 }
 
 // SendToSubscriber calls SendToSubscriber method of repository
-func (priceServiceSrv *PriceServiceService) SendToSubscriber(ctx context.Context, subscriberID uuid.UUID, stream proto_services.PriceServiceService_SubscribeServer) {
-	priceServiceSrv.priceServiceRepo.SendToSubscriber(ctx, subscriberID, priceServiceSrv.subscribersMngr.SubscribersShares, stream)
+func (priceServiceSrv *PriceServiceService) SendToSubscriber(ctx context.Context, subscriberID uuid.UUID, stream proto_services.PriceServiceService_SubscribeServer) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case shares := <-priceServiceSrv.subscribersMngr.SubscribersShares[subscriberID]:
+			var protoShares []*proto_services.Share
+			for _, share := range shares {
+				protoShares = append(protoShares, &proto_services.Share{
+					Name:  share.Name,
+					Price: share.Price,
+				})
+			}
+
+			err := priceServiceSrv.priceServiceRepo.SendToSubscriber(protoShares, stream)
+			if err != nil {
+				return fmt.Errorf("PriceServiceRepository -> SendToSubscriber -> %v", err)
+			}
+		}
+	}
 }

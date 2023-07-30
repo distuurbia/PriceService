@@ -13,9 +13,9 @@ import (
 // PriceServiceService is an interface that contains methods of PriceService service.
 type PriceServiceService interface {
 	ReadFromStream(ctx context.Context) (shares []*model.Share, err error)
-	AddSubscriber(subscriberID uuid.UUID, selectedShares []string)
-	DeleteSubscriber(subscriberID uuid.UUID)
-	SendToSubscriber(ctx context.Context, subscriberID uuid.UUID, stream proto_services.PriceServiceService_SubscribeServer)
+	AddSubscriber(subscriberID uuid.UUID, selectedShares []string) error
+	DeleteSubscriber(subscriberID uuid.UUID) error
+	SendToSubscriber(ctx context.Context, subscriberID uuid.UUID, stream proto_services.PriceServiceService_SubscribeServer) error
 	SendToAllSubscribedChans(ctx context.Context)
 }
 
@@ -40,9 +40,23 @@ func (handl *Handler) Subscribe(req *proto_services.SubscribeRequest, stream pro
 		return err
 	}
 
-	handl.priceServiceSrv.AddSubscriber(subscriberID, req.SelectedShares)
-	handl.priceServiceSrv.SendToSubscriber(stream.Context(), subscriberID, stream)
-	handl.priceServiceSrv.DeleteSubscriber(subscriberID)
+	err = handl.priceServiceSrv.AddSubscriber(subscriberID, req.SelectedShares)
+	if err != nil {
+		logrus.Errorf("Handler -> ReadFromStream -> AddSubscriber: %v", err)
+		return err
+	}
+
+	err = handl.priceServiceSrv.SendToSubscriber(stream.Context(), subscriberID, stream)
+	if err != nil {
+		logrus.Errorf("Handler -> ReadFromStream -> SendToSubscriber: %v", err)
+		return err
+	}
+
+	err = handl.priceServiceSrv.DeleteSubscriber(subscriberID)
+	if err != nil {
+		logrus.Errorf("Handler -> ReadFromStream -> DeleteSubscriber: %v", err)
+		return err
+	}
 
 	return nil
 }
