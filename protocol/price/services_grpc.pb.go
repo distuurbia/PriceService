@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v3.12.4
-// source: services.proto
+// source: PriceService/protocol/price/services.proto
 
-package proto_services
+package protocol
 
 import (
 	context "context"
@@ -128,5 +128,5 @@ var PriceServiceService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "services.proto",
+	Metadata: "PriceService/protocol/price/services.proto",
 }

@@ -21,7 +21,7 @@ var (
 	}
 )
 
-func TestMain(m *testing.M){
+func TestMain(m *testing.M) {
 	exitCode := m.Run()
 	os.Exit(exitCode)
 }
