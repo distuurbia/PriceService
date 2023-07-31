@@ -10,7 +10,7 @@ import (
 	"github.com/distuurbia/PriceService/internal/handler"
 	"github.com/distuurbia/PriceService/internal/repository"
 	"github.com/distuurbia/PriceService/internal/service"
-	"github.com/distuurbia/PriceService/proto_services"
+	protocol "github.com/distuurbia/PriceService/protocol/price"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -40,7 +40,7 @@ func main() {
 		logrus.Fatalf("cannot connect listener: %s", err)
 	}
 	serverRegistrar := grpc.NewServer()
-	proto_services.RegisterPriceServiceServiceServer(serverRegistrar, handl)
+	protocol.RegisterPriceServiceServiceServer(serverRegistrar, handl)
 
 	err = serverRegistrar.Serve(lis)
 	if err != nil {

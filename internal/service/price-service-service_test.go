@@ -6,134 +6,127 @@ import (
 	"time"
 
 	"github.com/distuurbia/PriceService/internal/service/mocks"
-	"github.com/distuurbia/PriceService/proto_services"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAddSubscriber(t *testing.T) {
-	priceServiceRepo := new(mocks.PriceServiceRepository)
-	priceServiceSrv := NewPriceServiceService(priceServiceRepo)
+	r := new(mocks.PriceServiceRepository)
+	s := NewPriceServiceService(r)
 
-	err := priceServiceSrv.AddSubscriber(testSubID, testSelectedShares)
+	err := s.AddSubscriber(testSubID, testSelectedShares)
 	require.NoError(t, err)
 
-	selectedShares, ok := priceServiceSrv.subscribersMngr.Subscribers[testSubID]
+	selectedShares, ok := s.submngr.Subscribers[testSubID]
 	require.True(t, ok)
 	require.Equal(t, len(selectedShares), len(testSelectedShares))
-
 }
 
 func TestAddNilIDSubscriber(t *testing.T) {
-	priceServiceRepo := new(mocks.PriceServiceRepository)
-	priceServiceSrv := NewPriceServiceService(priceServiceRepo)
+	r := new(mocks.PriceServiceRepository)
+	s := NewPriceServiceService(r)
 
-	err := priceServiceSrv.AddSubscriber(uuid.Nil, testSelectedShares)
+	err := s.AddSubscriber(uuid.Nil, testSelectedShares)
 	require.Error(t, err)
 }
 
 func TestAddEmptySharesSubscriber(t *testing.T) {
-	priceServiceRepo := new(mocks.PriceServiceRepository)
-	priceServiceSrv := NewPriceServiceService(priceServiceRepo)
+	r := new(mocks.PriceServiceRepository)
+	s := NewPriceServiceService(r)
 
-	err := priceServiceSrv.AddSubscriber(testSubID, []string{})
+	err := s.AddSubscriber(testSubID, []string{})
 	require.Error(t, err)
 }
 
 func TestAddExistingSubscriber(t *testing.T) {
-	priceServiceRepo := new(mocks.PriceServiceRepository)
-	priceServiceSrv := NewPriceServiceService(priceServiceRepo)
+	r := new(mocks.PriceServiceRepository)
+	s := NewPriceServiceService(r)
 
-	err := priceServiceSrv.AddSubscriber(testSubID, testSelectedShares)
+	err := s.AddSubscriber(testSubID, testSelectedShares)
 	require.NoError(t, err)
 
-	err = priceServiceSrv.AddSubscriber(testSubID, testSelectedShares)
+	err = s.AddSubscriber(testSubID, testSelectedShares)
 	require.Error(t, err)
 }
 
 func TestDeleteSubscriber(t *testing.T) {
-	priceServiceRepo := new(mocks.PriceServiceRepository)
-	priceServiceSrv := NewPriceServiceService(priceServiceRepo)
+	r := new(mocks.PriceServiceRepository)
+	s := NewPriceServiceService(r)
 
-	err := priceServiceSrv.AddSubscriber(testSubID, testSelectedShares)
+	err := s.AddSubscriber(testSubID, testSelectedShares)
 	require.NoError(t, err)
 
-	err = priceServiceSrv.DeleteSubscriber(testSubID)
+	err = s.DeleteSubscriber(testSubID)
 	require.NoError(t, err)
 }
 
 func TestDeleteNilIDSubscriber(t *testing.T) {
-	priceServiceRepo := new(mocks.PriceServiceRepository)
-	priceServiceSrv := NewPriceServiceService(priceServiceRepo)
+	r := new(mocks.PriceServiceRepository)
+	s := NewPriceServiceService(r)
 
-	err := priceServiceSrv.DeleteSubscriber(uuid.Nil)
+	err := s.DeleteSubscriber(uuid.Nil)
 	require.Error(t, err)
 }
 
 func TestDeleteNotExistingSubscriber(t *testing.T) {
-	priceServiceRepo := new(mocks.PriceServiceRepository)
-	priceServiceSrv := NewPriceServiceService(priceServiceRepo)
+	r := new(mocks.PriceServiceRepository)
+	s := NewPriceServiceService(r)
 
-	err := priceServiceSrv.DeleteSubscriber(testSubID)
+	err := s.DeleteSubscriber(testSubID)
 	require.Error(t, err)
 }
 
 func TestReadFromStream(t *testing.T) {
-	priceServiceRepo := new(mocks.PriceServiceRepository)
-	priceServiceRepo.On("ReadFromStream", mock.Anything).
+	r := new(mocks.PriceServiceRepository)
+	r.On("ReadFromStream", mock.Anything).
 		Return(testShares, nil).
 		Once()
-	priceServiceSrv := NewPriceServiceService(priceServiceRepo)
-	shares, err := priceServiceSrv.ReadFromStream(context.Background())
+	s := NewPriceServiceService(r)
+	shares, err := s.ReadFromStream(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, len(shares), len(testShares))
-	priceServiceRepo.AssertExpectations(t)
+	r.AssertExpectations(t)
 }
 
 func TestSendToAllSubscribedChans(t *testing.T) {
-	priceServiceRepo := new(mocks.PriceServiceRepository)
-	priceServiceRepo.On("ReadFromStream", mock.Anything).
+	r := new(mocks.PriceServiceRepository)
+	r.On("ReadFromStream", mock.Anything).
 		Return(testShares, nil)
 
-	priceServiceSrv := NewPriceServiceService(priceServiceRepo)
+	s := NewPriceServiceService(r)
 
-	err := priceServiceSrv.AddSubscriber(testSubID, testSelectedShares)
+	err := s.AddSubscriber(testSubID, testSelectedShares)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	priceServiceSrv.SendToAllSubscribedChans(ctx)
+	s.SendToAllSubscribedChans(ctx)
 
-	close(priceServiceSrv.subscribersMngr.SubscribersShares[testSubID])
-	shares := <-priceServiceSrv.subscribersMngr.SubscribersShares[testSubID]
+	close(s.submngr.SubscribersShares[testSubID])
+	shares := <-s.submngr.SubscribersShares[testSubID]
 	cancel()
 	require.Equal(t, len(testSelectedShares), len(shares))
-	
-	priceServiceRepo.AssertExpectations(t)
+
+	r.AssertExpectations(t)
 }
 
 func TestSendToSubscriber(t *testing.T) {
-	priceServiceRepo := new(mocks.PriceServiceRepository)
-	priceServiceRepo.On("SendToSubscriber", mock.Anything, mock.Anything).
-		Return(nil)
-	priceServiceSrv := NewPriceServiceService(priceServiceRepo)
+	r := new(mocks.PriceServiceRepository)
+	s := NewPriceServiceService(r)
 
-	err := priceServiceSrv.AddSubscriber(testSubID, testSelectedShares)
+	err := s.AddSubscriber(testSubID, testSelectedShares)
 	require.NoError(t, err)
 
-	priceServiceSrv.subscribersMngr.SubscribersShares[testSubID] <- testShares
+	s.submngr.SubscribersShares[testSubID] <- testShares
 
-	close(priceServiceSrv.subscribersMngr.SubscribersShares[testSubID])
-
-	var stream proto_services.PriceServiceService_SubscribeServer
+	close(s.submngr.SubscribersShares[testSubID])
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	err = priceServiceSrv.SendToSubscriber(ctx, testSubID, stream)
+	shares, err := s.SendToSubscriber(ctx, testSubID)
 	cancel()
 	require.NoError(t, err)
-	
-	priceServiceRepo.AssertExpectations(t)
 
-	
+	require.Equal(t, len(testShares), len(shares))
 
+	r.AssertExpectations(t)
 }

@@ -5,7 +5,7 @@ import (
 	"context"
 
 	"github.com/distuurbia/PriceService/internal/model"
-	"github.com/distuurbia/PriceService/proto_services"
+	protocol "github.com/distuurbia/PriceService/protocol/price"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
@@ -15,48 +15,55 @@ type PriceServiceService interface {
 	ReadFromStream(ctx context.Context) (shares []*model.Share, err error)
 	AddSubscriber(subscriberID uuid.UUID, selectedShares []string) error
 	DeleteSubscriber(subscriberID uuid.UUID) error
-	SendToSubscriber(ctx context.Context, subscriberID uuid.UUID, stream proto_services.PriceServiceService_SubscribeServer) error
+	SendToSubscriber(ctx context.Context, subscriberID uuid.UUID) ([]*protocol.Share, error)
 	SendToAllSubscribedChans(ctx context.Context)
 }
 
 // Handler is responsible for handling gRPC requests related to entities.
 type Handler struct {
-	priceServiceSrv PriceServiceService
-	proto_services.UnimplementedPriceServiceServiceServer
+	s PriceServiceService
+	protocol.UnimplementedPriceServiceServiceServer
 }
 
 // NewHandler creates a new instance of the Handler struct.
-func NewHandler(priceServiceSrv PriceServiceService) *Handler {
+func NewHandler(s PriceServiceService) *Handler {
 	return &Handler{
-		priceServiceSrv: priceServiceSrv,
+		s: s,
 	}
 }
 
 // Subscribe takes message from redis stream through PriceServiceService and sends it to grpc stream.
-func (handl *Handler) Subscribe(req *proto_services.SubscribeRequest, stream proto_services.PriceServiceService_SubscribeServer) error {
+func (h *Handler) Subscribe(req *protocol.SubscribeRequest, stream protocol.PriceServiceService_SubscribeServer) error {
 	subscriberID, err := uuid.Parse(req.UUID)
 	if err != nil {
 		logrus.Errorf("Handler -> ReadFromStream -> uuid.Parse: %v", err)
 		return err
 	}
 
-	err = handl.priceServiceSrv.AddSubscriber(subscriberID, req.SelectedShares)
+	err = h.s.AddSubscriber(subscriberID, req.SelectedShares)
 	if err != nil {
 		logrus.Errorf("Handler -> ReadFromStream -> AddSubscriber: %v", err)
 		return err
 	}
 
-	err = handl.priceServiceSrv.SendToSubscriber(stream.Context(), subscriberID, stream)
-	if err != nil {
-		logrus.Errorf("Handler -> ReadFromStream -> SendToSubscriber: %v", err)
-		return err
-	}
+	for {
+		protoShares, errSend := h.s.SendToSubscriber(stream.Context(), subscriberID)
 
-	err = handl.priceServiceSrv.DeleteSubscriber(subscriberID)
-	if err != nil {
-		logrus.Errorf("Handler -> ReadFromStream -> DeleteSubscriber: %v", err)
-		return err
-	}
+		if errSend != nil {
+			logrus.Errorf("Handler -> Subscribe -> SendToSubscriber -> %v", err)
 
-	return nil
+			errDelete := h.s.DeleteSubscriber(subscriberID)
+			if errDelete != nil {
+				logrus.Errorf("Handler -> DeleteSubscriber: %v", err)
+				return errDelete
+			}
+
+			return errSend
+		}
+		err := stream.Send(&protocol.SubscribeResponse{Shares: protoShares})
+		if err != nil {
+			logrus.Errorf("Handler -> Subscribe -> stream.Send: %v", err)
+			return err
+		}
+	}
 }
