@@ -66,7 +66,7 @@ func (h *Handler) Subscribe(req *protocol.SubscribeRequest, stream protocol.Pric
 		return err
 	}
 
-	err = h.validate. VarCtx(stream.Context(), req.SelectedShares, "required")
+	err = h.validate.VarCtx(stream.Context(), req.SelectedShares, "required")
 	if err != nil {
 		logrus.Errorf("Handler -> Subscribe -> %v", err)
 		return err
