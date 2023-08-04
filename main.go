@@ -11,6 +11,7 @@ import (
 	"github.com/distuurbia/PriceService/internal/repository"
 	"github.com/distuurbia/PriceService/internal/service"
 	protocol "github.com/distuurbia/PriceService/protocol/price"
+	"github.com/go-playground/validator"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -33,9 +34,10 @@ func main() {
 	client := connectRedis(&cfg)
 	priceServiceRepo := repository.NewPriceServiceRepository(client, &cfg)
 	priceServiceService := service.NewPriceServiceService(priceServiceRepo)
-	handl := handler.NewHandler(priceServiceService)
+	validate := validator.New()
+	handl := handler.NewHandler(priceServiceService, validate)
 	go priceServiceService.SendToAllSubscribedChans(context.Background())
-	lis, err := net.Listen("tcp", "localhost:5433")
+	lis, err := net.Listen("tcp", "localhost:8080")
 	if err != nil {
 		logrus.Fatalf("cannot connect listener: %s", err)
 	}
