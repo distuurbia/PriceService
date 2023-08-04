@@ -72,7 +72,7 @@ func TestSubscribe(t *testing.T) {
 	closer()
 }
 
-func TestValidationID(t *testing.T){
+func TestValidationID(t *testing.T) {
 	s := new(mocks.PriceServiceService)
 	h := NewHandler(s, validate)
 

@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-var ( 
+var (
 	testShares = []*protocol.Share{
 		{Name: "Apple", Price: 250},
 		{Name: "Tesla", Price: 1000},
