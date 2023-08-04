@@ -35,12 +35,6 @@ func (s *PriceServiceService) AddSubscriber(subscriberID uuid.UUID, selectedShar
 	const msgs = 1
 	s.submngr.Mu.Lock()
 	defer s.submngr.Mu.Unlock()
-	if subscriberID == uuid.Nil {
-		return fmt.Errorf("PriceServiceService -> AddSubscriber -> error: subscriber has nil uuid")
-	}
-	if len(selectedShares) == 0 {
-		return fmt.Errorf("PriceServiceService -> AddSubscriber -> error: subscriber hasn't subscribed on any shares")
-	}
 	if _, ok := s.submngr.Subscribers[subscriberID]; !ok {
 		s.submngr.Subscribers[subscriberID] = selectedShares
 		s.submngr.SubscribersShares[subscriberID] = make(chan []*model.Share, msgs)
@@ -53,9 +47,6 @@ func (s *PriceServiceService) AddSubscriber(subscriberID uuid.UUID, selectedShar
 func (s *PriceServiceService) DeleteSubscriber(subscriberID uuid.UUID) error {
 	s.submngr.Mu.Lock()
 	defer s.submngr.Mu.Unlock()
-	if subscriberID == uuid.Nil {
-		return fmt.Errorf("PriceServiceService -> DeleteSubscriber -> error: subscriber has nil uuid")
-	}
 	if _, ok := s.submngr.Subscribers[subscriberID]; ok {
 		delete(s.submngr.Subscribers, subscriberID)
 		close(s.submngr.SubscribersShares[subscriberID])

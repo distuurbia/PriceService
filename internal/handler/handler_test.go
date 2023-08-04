@@ -6,6 +6,7 @@ import (
 
 	"github.com/distuurbia/PriceService/internal/handler/mocks"
 	protocol "github.com/distuurbia/PriceService/protocol/price"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -69,4 +70,14 @@ func TestSubscribe(t *testing.T) {
 	}
 
 	closer()
+}
+
+func TestValidationID(t *testing.T){
+	s := new(mocks.PriceServiceService)
+	h := NewHandler(s, validate)
+
+	testID := uuid.New()
+	parsedID, err := h.ValidationID(context.Background(), testID.String())
+	require.NoError(t, err)
+	require.Equal(t, testID, parsedID)
 }

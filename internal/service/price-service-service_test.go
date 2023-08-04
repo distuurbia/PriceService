@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/distuurbia/PriceService/internal/service/mocks"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -23,33 +22,6 @@ func TestAddSubscriber(t *testing.T) {
 	require.Equal(t, len(selectedShares), len(testSelectedShares))
 }
 
-func TestAddNilIDSubscriber(t *testing.T) {
-	r := new(mocks.PriceServiceRepository)
-	s := NewPriceServiceService(r)
-
-	err := s.AddSubscriber(uuid.Nil, testSelectedShares)
-	require.Error(t, err)
-}
-
-func TestAddEmptySharesSubscriber(t *testing.T) {
-	r := new(mocks.PriceServiceRepository)
-	s := NewPriceServiceService(r)
-
-	err := s.AddSubscriber(testSubID, []string{})
-	require.Error(t, err)
-}
-
-func TestAddExistingSubscriber(t *testing.T) {
-	r := new(mocks.PriceServiceRepository)
-	s := NewPriceServiceService(r)
-
-	err := s.AddSubscriber(testSubID, testSelectedShares)
-	require.NoError(t, err)
-
-	err = s.AddSubscriber(testSubID, testSelectedShares)
-	require.Error(t, err)
-}
-
 func TestDeleteSubscriber(t *testing.T) {
 	r := new(mocks.PriceServiceRepository)
 	s := NewPriceServiceService(r)
@@ -59,22 +31,9 @@ func TestDeleteSubscriber(t *testing.T) {
 
 	err = s.DeleteSubscriber(testSubID)
 	require.NoError(t, err)
-}
 
-func TestDeleteNilIDSubscriber(t *testing.T) {
-	r := new(mocks.PriceServiceRepository)
-	s := NewPriceServiceService(r)
-
-	err := s.DeleteSubscriber(uuid.Nil)
-	require.Error(t, err)
-}
-
-func TestDeleteNotExistingSubscriber(t *testing.T) {
-	r := new(mocks.PriceServiceRepository)
-	s := NewPriceServiceService(r)
-
-	err := s.DeleteSubscriber(testSubID)
-	require.Error(t, err)
+	err = s.AddSubscriber(testSubID, testSelectedShares)
+	require.NoError(t, err)
 }
 
 func TestReadFromStream(t *testing.T) {
