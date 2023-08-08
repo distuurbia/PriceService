@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/distuurbia/PriceService/proto_services";
+option go_package = "github.com/distuurbia/PriceService/price-service";
 
 message Share {
     string Name = 1;
