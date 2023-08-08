@@ -37,7 +37,7 @@ func main() {
 	validate := validator.New()
 	handl := handler.NewHandler(priceServiceService, validate)
 	go priceServiceService.SendToAllSubscribedChans(context.Background())
-	lis, err := net.Listen("tcp", "localhost:8080")
+	lis, err := net.Listen("tcp", "localhost:8081")
 	if err != nil {
 		logrus.Fatalf("cannot connect listener: %s", err)
 	}
