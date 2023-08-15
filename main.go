@@ -41,6 +41,7 @@ func main() {
 	if err != nil {
 		logrus.Fatalf("cannot connect listener: %s", err)
 	}
+
 	serverRegistrar := grpc.NewServer()
 	protocol.RegisterPriceServiceServiceServer(serverRegistrar, handl)
 

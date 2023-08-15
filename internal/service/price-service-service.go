@@ -20,13 +20,13 @@ type PriceServiceRepository interface {
 // PriceServiceService contains an inerface of PriceServiceRepository
 type PriceServiceService struct {
 	r       PriceServiceRepository
-	submngr model.SubscribersManager
+	submngr *model.SubscribersManager
 }
 
 // NewPriceServiceService creates an object of PriceServiceService by using PriceServiceRepository interface
 func NewPriceServiceService(r PriceServiceRepository) *PriceServiceService {
 	return &PriceServiceService{r: r,
-		submngr: model.SubscribersManager{SubscribersShares: make(map[uuid.UUID]chan []*model.Share),
+		submngr: &model.SubscribersManager{SubscribersShares: make(map[uuid.UUID]chan []*model.Share),
 			Subscribers: make(map[uuid.UUID][]string)}}
 }
 
@@ -68,25 +68,26 @@ func (s *PriceServiceService) ReadFromStream(ctx context.Context) (shares []*mod
 // SendToAllSubscribedChans sends in loop actual info about subscribed shares to subscribers chans
 func (s *PriceServiceService) SendToAllSubscribedChans(ctx context.Context) {
 	for {
-		if len(s.submngr.Subscribers) > 0 {
-			shares, err := s.ReadFromStream(ctx)
-			if err != nil {
-				logrus.Errorf("PriceServiceService -> SendToAllSubscribedChans: %v", err)
-				return
+		if len(s.submngr.Subscribers) == 0 {
+			continue
+		}
+		shares, err := s.ReadFromStream(ctx)
+		if err != nil {
+			logrus.Errorf("PriceServiceService -> SendToAllSubscribedChans: %v", err)
+			return
+		}
+		for subID, selcetedShares := range s.submngr.Subscribers {
+			tempShares := make([]*model.Share, 0)
+			for _, share := range shares {
+				if strings.Contains(strings.Join(selcetedShares, ","), share.Name) {
+					tempShares = append(tempShares, share)
+				}
 			}
-			for subID, selcetedShares := range s.submngr.Subscribers {
-				tempShares := make([]*model.Share, 0)
-				for _, share := range shares {
-					if strings.Contains(strings.Join(selcetedShares, ","), share.Name) {
-						tempShares = append(tempShares, share)
-					}
-				}
 
-				select {
-				case <-ctx.Done():
-					return
-				case s.submngr.SubscribersShares[subID] <- tempShares:
-				}
+			select {
+			case <-ctx.Done():
+				return
+			case s.submngr.SubscribersShares[subID] <- tempShares:
 			}
 		}
 	}

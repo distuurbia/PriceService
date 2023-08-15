@@ -82,20 +82,27 @@ func (h *Handler) Subscribe(req *protocol.SubscribeRequest, stream protocol.Pric
 		protoShares, errSend := h.s.SendToSubscriber(stream.Context(), subscriberID)
 
 		if errSend != nil {
-			logrus.Errorf("Handler -> Subscribe -> %v", err)
+			logrus.Errorf("Handler -> Subscribe -> %v", errSend)
 
 			errDelete := h.s.DeleteSubscriber(subscriberID)
 			if errDelete != nil {
-				logrus.Errorf("Handler -> Subscribe -> %v", err)
+				logrus.Errorf("Handler -> Subscribe -> %v", errSend)
 				return errDelete
 			}
-
+			
 			return errSend
 		}
+ 
 		err := stream.Send(&protocol.SubscribeResponse{Shares: protoShares})
 		if err != nil {
+			errDelete := h.s.DeleteSubscriber(subscriberID)
+			if errDelete != nil {
+				logrus.Errorf("Handler -> Subscribe -> %v", errSend)
+				return errDelete
+			}
 			logrus.Errorf("Handler -> Subscribe -> %v", err)
 			return err
 		}
 	}
+	
 }
