@@ -4,7 +4,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/distuurbia/PriceService/internal/model"
 	protocol "github.com/distuurbia/PriceService/protocol/price"
@@ -76,11 +75,15 @@ func (s *PriceServiceService) SendToAllSubscribedChans(ctx context.Context) {
 			logrus.Errorf("PriceServiceService -> SendToAllSubscribedChans: %v", err)
 			return
 		}
+		s.submngr.Mu.Lock()
 		for subID, selcetedShares := range s.submngr.Subscribers {
 			tempShares := make([]*model.Share, 0)
 			for _, share := range shares {
-				if strings.Contains(strings.Join(selcetedShares, ","), share.Name) {
-					tempShares = append(tempShares, share)
+				for _, selectedShare := range selcetedShares {
+					if selectedShare == share.Name {
+						tempShares = append(tempShares, share)
+						break
+					}
 				}
 			}
 
@@ -90,6 +93,7 @@ func (s *PriceServiceService) SendToAllSubscribedChans(ctx context.Context) {
 			case s.submngr.SubscribersShares[subID] <- tempShares:
 			}
 		}
+		s.submngr.Mu.Unlock()
 	}
 }
 
