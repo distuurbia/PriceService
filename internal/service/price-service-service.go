@@ -25,18 +25,17 @@ type PriceServiceService struct {
 // NewPriceServiceService creates an object of PriceServiceService by using PriceServiceRepository interface
 func NewPriceServiceService(r PriceServiceRepository) *PriceServiceService {
 	return &PriceServiceService{r: r,
-		submngr: &model.SubscribersManager{SubscribersShares: make(map[uuid.UUID]chan []*model.Share),
+		submngr: &model.SubscribersManager{SubscribersShares: make(map[uuid.UUID]chan model.Share),
 			Subscribers: make(map[uuid.UUID][]string)}}
 }
 
 // AddSubscriber adds new subscriber to subscribe map in SubscriberManager
 func (s *PriceServiceService) AddSubscriber(subscriberID uuid.UUID, selectedShares []string) error {
-	const msgs = 1
 	s.submngr.Mu.Lock()
 	defer s.submngr.Mu.Unlock()
 	if _, ok := s.submngr.Subscribers[subscriberID]; !ok {
 		s.submngr.Subscribers[subscriberID] = selectedShares
-		s.submngr.SubscribersShares[subscriberID] = make(chan []*model.Share, msgs)
+		s.submngr.SubscribersShares[subscriberID] = make(chan model.Share, len(selectedShares))
 		return nil
 	}
 	return fmt.Errorf("PriceServiceService -> AddSubscriber -> error: subscriber with such ID already exists")
@@ -66,31 +65,31 @@ func (s *PriceServiceService) ReadFromStream(ctx context.Context) (shares []*mod
 
 // SendToAllSubscribedChans sends in loop actual info about subscribed shares to subscribers chans
 func (s *PriceServiceService) SendToAllSubscribedChans(ctx context.Context) {
+	shares := make(map[string]float64)
 	for {
 		if len(s.submngr.Subscribers) == 0 {
 			continue
 		}
-		shares, err := s.ReadFromStream(ctx)
+		sliceOfShares, err := s.ReadFromStream(ctx)
 		if err != nil {
 			logrus.Errorf("PriceServiceService -> SendToAllSubscribedChans: %v", err)
 			return
 		}
+		for _, share := range sliceOfShares {
+			shares[share.Name] = share.Price
+		}
 		s.submngr.Mu.Lock()
 		for subID, selcetedShares := range s.submngr.Subscribers {
-			tempShares := make([]*model.Share, 0)
-			for _, share := range shares {
-				for _, selectedShare := range selcetedShares {
-					if selectedShare == share.Name {
-						tempShares = append(tempShares, share)
-						break
-					}
-				}
+			if len(s.submngr.SubscribersShares[subID]) != 0 {
+				continue
 			}
-
-			select {
-			case <-ctx.Done():
-				return
-			case s.submngr.SubscribersShares[subID] <- tempShares:
+			for _, selectedShare := range selcetedShares {
+				select {
+				case <-ctx.Done():
+					s.submngr.Mu.Unlock()
+					return
+				case s.submngr.SubscribersShares[subID] <- model.Share{Name: selectedShare, Price: shares[selectedShare]}:
+				}
 			}
 		}
 		s.submngr.Mu.Unlock()
@@ -102,8 +101,13 @@ func (s *PriceServiceService) SendToSubscriber(ctx context.Context, subscriberID
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case shares := <-s.submngr.SubscribersShares[subscriberID]:
-		for _, share := range shares {
+	case share := <-s.submngr.SubscribersShares[subscriberID]:
+		protoShares = append(protoShares, &protocol.Share{
+			Name:  share.Name,
+			Price: share.Price,
+		})
+		for i := 1; i < len(s.submngr.Subscribers[subscriberID]); i++ {
+			share = <-s.submngr.SubscribersShares[subscriberID]
 			protoShares = append(protoShares, &protocol.Share{
 				Name:  share.Name,
 				Price: share.Price,

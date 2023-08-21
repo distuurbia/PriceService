@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/distuurbia/PriceService/internal/service/mocks"
 	"github.com/stretchr/testify/mock"
@@ -58,31 +57,44 @@ func TestSendToAllSubscribedChans(t *testing.T) {
 	err := s.AddSubscriber(testSubID, testSelectedShares)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	s.SendToAllSubscribedChans(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
+	go s.SendToAllSubscribedChans(ctx)
 
-	close(s.submngr.SubscribersShares[testSubID])
-	shares := <-s.submngr.SubscribersShares[testSubID]
+	readedShares := make(map[string]float64)
+	for i := 0; i < 3; i++ {
+		testShare := <-s.submngr.SubscribersShares[testSubID]
+		readedShares[testShare.Name] = testShare.Price
+	}
 	cancel()
-	require.Equal(t, len(testSelectedShares), len(shares))
 
+	err = s.DeleteSubscriber(testSubID)
+	require.NoError(t, err)
+
+	for i := 0; i < 3; i++ {
+		require.Equal(t, testShares[i].Price, readedShares[testShares[i].Name])
+	}
 	r.AssertExpectations(t)
 }
 
 func TestSendToSubscriber(t *testing.T) {
 	r := new(mocks.PriceServiceRepository)
+	r.On("ReadFromStream", mock.Anything).
+		Return(testShares, nil)
+
 	s := NewPriceServiceService(r)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go s.SendToAllSubscribedChans(ctx)
 
 	err := s.AddSubscriber(testSubID, testSelectedShares)
 	require.NoError(t, err)
 
-	s.submngr.SubscribersShares[testSubID] <- testShares
-
-	close(s.submngr.SubscribersShares[testSubID])
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	shares, err := s.SendToSubscriber(ctx, testSubID)
+	require.NoError(t, err)
+
 	cancel()
+
+	err = s.DeleteSubscriber(testSubID)
 	require.NoError(t, err)
 
 	require.Equal(t, len(testShares), len(shares))

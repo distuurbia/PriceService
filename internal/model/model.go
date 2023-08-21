@@ -17,5 +17,5 @@ type Share struct {
 type SubscribersManager struct {
 	Mu                sync.RWMutex
 	Subscribers       map[uuid.UUID][]string
-	SubscribersShares map[uuid.UUID]chan []*Share
+	SubscribersShares map[uuid.UUID]chan Share
 }

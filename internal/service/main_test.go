@@ -13,6 +13,7 @@ var (
 	testSelectedShares = []string{
 		"Apple",
 		"Tesla",
+		"Google",
 	}
 	testShares = []*model.Share{
 		{Name: "Apple", Price: 500},

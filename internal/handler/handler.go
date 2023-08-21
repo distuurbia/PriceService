@@ -40,18 +40,15 @@ func NewHandler(s PriceServiceService, validate *validator.Validate) *Handler {
 func (h *Handler) ValidationID(ctx context.Context, id string) (uuid.UUID, error) {
 	err := h.validate.VarCtx(ctx, id, "required,uuid")
 	if err != nil {
-		logrus.Errorf("ValidationID -> %v", err)
 		return uuid.Nil, err
 	}
 
 	validatedID, err := uuid.Parse(id)
 	if err != nil {
-		logrus.Errorf("ValidationID -> %v", err)
 		return uuid.Nil, err
 	}
 
 	if validatedID == uuid.Nil {
-		logrus.Errorf("ValidationID -> error: failed to use uuid")
 		return uuid.Nil, fmt.Errorf("ValidationID -> error: failed to use uuid")
 	}
 
@@ -62,19 +59,22 @@ func (h *Handler) ValidationID(ctx context.Context, id string) (uuid.UUID, error
 func (h *Handler) Subscribe(req *protocol.SubscribeRequest, stream protocol.PriceServiceService_SubscribeServer) error {
 	subscriberID, err := h.ValidationID(stream.Context(), req.UUID)
 	if err != nil {
-		logrus.Errorf("Handler -> Subscribe -> %v", err)
+		logrus.WithField("req.UUID", req.UUID).Errorf("Handler -> Subscribe -> %v", err)
 		return err
 	}
 
 	err = h.validate.VarCtx(stream.Context(), req.SelectedShares, "required")
 	if err != nil {
-		logrus.Errorf("Handler -> Subscribe -> %v", err)
+		logrus.WithField("req.SelectedShares", req.SelectedShares).Errorf("Handler -> Subscribe -> %v", err)
 		return err
 	}
 
 	err = h.s.AddSubscriber(subscriberID, req.SelectedShares)
 	if err != nil {
-		logrus.Errorf("Handler -> Subscribe -> %v", err)
+		logrus.WithFields(logrus.Fields{
+			"subscriberID": subscriberID,
+			"req.SelectedShares": req.SelectedShares,
+		}).Errorf("Handler -> Subscribe -> %v", err)
 		return err
 	}
 
@@ -82,27 +82,27 @@ func (h *Handler) Subscribe(req *protocol.SubscribeRequest, stream protocol.Pric
 		protoShares, errSend := h.s.SendToSubscriber(stream.Context(), subscriberID)
 
 		if errSend != nil {
-			logrus.Errorf("Handler -> Subscribe -> %v", errSend)
+			logrus.WithField("subscriberID", subscriberID).Errorf("Handler -> Subscribe -> %v", errSend)
 
 			errDelete := h.s.DeleteSubscriber(subscriberID)
 			if errDelete != nil {
-				logrus.Errorf("Handler -> Subscribe -> %v", errSend)
+				logrus.WithField("subscriberID", subscriberID).Errorf("Handler -> Subscribe -> %v", errSend)
 				return errDelete
 			}
-			
+
 			return errSend
 		}
- 
+
 		err := stream.Send(&protocol.SubscribeResponse{Shares: protoShares})
+		logrus.WithField("Shares", protoShares).Errorf("Handler -> Subscribe -> %v", errSend)
 		if err != nil {
 			errDelete := h.s.DeleteSubscriber(subscriberID)
 			if errDelete != nil {
-				logrus.Errorf("Handler -> Subscribe -> %v", errSend)
+				logrus.WithField("subscriberID", subscriberID).Errorf("Handler -> Subscribe -> %v", errSend)
 				return errDelete
 			}
-			logrus.Errorf("Handler -> Subscribe -> %v", err)
+			logrus.WithField("subscriberID", subscriberID).Errorf("Handler -> Subscribe -> %v", err)
 			return err
 		}
 	}
-	
 }
